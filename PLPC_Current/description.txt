@@ -1,0 +1,12 @@
+Currently supports patch 1.12.
+
+If you're playing on any version below 1.9, please use the legacy version of this mod instead: https://steamcommunity.com/sharedfiles/filedetails/?id=2020606549
+
+This mod gives players full and direct control of peace conference proceedings in wars they are involved in.
+
+IMPORTANT: You may need to press "Pass" a couple of times before the AI gives you their points.
+
+You can distribute territory to your allies by clicking on their flag and then clicking on the map.
+Wars without player involvement conclude as normal.
+
+This mod makes no changes to anything else other than peace conference AI and is compatible with any and all other mods and will work in multiplayer games.

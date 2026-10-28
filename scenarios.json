@@ -1,0 +1,205 @@
+﻿[
+    {
+        "id":  "acw_macarthur",
+        "title":  "ACW: MacArthur",
+        "preset":  "American Civil War - MacArthur",
+        "picture":  "img/scn_acw_macarthur.jpg",
+        "about":  "Second American Civil War with MacArthur. Canada stays out, Mexico (Sinarquistas) can join in, war goals and factions free. Every version also comes with a ready save as MacArthur\u0027s USA around the time the country breaks apart (Load Game \u003e ACW_MacArthur_KR_\u003cversion\u003e).",
+        "save":  "ACW_MacArthur_KR_",
+        "versions":  {
+                         "1.5.4":  {
+                                       "save_version":  4,
+                                       "rules":  {
+
+                                                 },
+                                       "has_save":  true,
+                                       "save_only":  true
+                                   },
+                         "1.6.2":  {
+                                       "save_version":  5,
+                                       "rules":  {
+                                                     "allow_wargoals":  "ALWAYS_FREE",
+                                                     "allow_leave_faction":  "ALLOWED"
+                                                 },
+                                       "has_save":  true,
+                                       "save_only":  true
+                                   },
+                         "1.7.1":  {
+                                       "save_version":  6,
+                                       "rules":  {
+                                                     "USA_civil_war":  "USA_CIVIL_WAR_FOUR_SIDES",
+                                                     "MEX_post_assassination":  "MEX_POST_ASSASSINATION_NATIONAL_POPULIST_SINARQUISTA",
+                                                     "allow_wargoals":  "ALWAYS_FREE",
+                                                     "allow_leave_faction":  "ALLOWED"
+                                                 },
+                                       "has_save":  true
+                                   },
+                         "1.8.2":  {
+                                       "save_version":  6,
+                                       "rules":  {
+                                                     "USA_civil_war":  "USA_CIVIL_WAR_FOUR_SIDES",
+                                                     "CAN_acw_support":  "CAN_ACW_SUPPORT_NONE",
+                                                     "CAN_acw_new_england":  "CAN_ACW_NEW_ENGLAND_NOT_TAKE",
+                                                     "MEX_post_assassination":  "MEX_POST_ASSASSINATION_NATIONAL_POPULIST_SINARQUISTA",
+                                                     "allow_wargoals":  "ALWAYS_FREE",
+                                                     "allow_create_faction":  "FREE",
+                                                     "allow_join_faction":  "FREE",
+                                                     "allow_leave_faction":  "ALLOWED"
+                                                 },
+                                       "has_save":  true
+                                   },
+                         "1.9.x":  {
+                                       "save_version":  7,
+                                       "rules":  {
+                                                     "USA_civil_war":  "USA_CIVIL_WAR_FOUR_SIDES",
+                                                     "CAN_acw_support":  "CAN_ACW_SUPPORT_NONE",
+                                                     "CAN_acw_new_england":  "CAN_ACW_NEW_ENGLAND_NOT_TAKE",
+                                                     "MEX_post_assassination":  "MEX_POST_ASSASSINATION_NATIONAL_POPULIST_SINARQUISTA",
+                                                     "allow_wargoals":  "ALWAYS_FREE",
+                                                     "faction_button_options":  "BUTTON_PRESENT"
+                                                 },
+                                       "has_save":  true
+                                   },
+                         "1.10.5":  {
+                                        "save_version":  7,
+                                        "rules":  {
+                                                      "USA_civil_war":  "USA_CIVIL_WAR_FOUR_SIDES",
+                                                      "CAN_acw_support":  "CAN_ACW_SUPPORT_NONE",
+                                                      "CAN_acw_new_england":  "CAN_ACW_NEW_ENGLAND_NOT_TAKE",
+                                                      "MEX_post_assassination":  "MEX_POST_ASSASSINATION_NATIONAL_POPULIST_SINARQUISTA",
+                                                      "allow_wargoals":  "ALWAYS_FREE",
+                                                      "faction_button_options":  "BUTTON_PRESENT"
+                                                  },
+                                        "has_save":  true
+                                    },
+                         "1.11.13":  {
+                                         "save_version":  10,
+                                         "rules":  {
+                                                       "USA_civil_war":  "USA_CIVIL_WAR_FOUR_SIDES",
+                                                       "CAN_acw_support":  "CAN_ACW_SUPPORT_NONE",
+                                                       "CAN_acw_new_england":  "CAN_ACW_NEW_ENGLAND_NOT_TAKE",
+                                                       "MEX_post_assassination":  "MEX_POST_ASSASSINATION_NATIONAL_POPULIST_SINARQUISTA",
+                                                       "allow_wargoals":  "ALWAYS_FREE"
+                                                   },
+                                         "has_save":  true
+                                     },
+                         "1.12.14":  {
+                                         "save_version":  15,
+                                         "rules":  {
+                                                       "USA_civil_war":  "USA_CIVIL_WAR_FOUR_SIDES",
+                                                       "CAN_acw_intervene":  "CAN_ACW_INTERVENE_NO",
+                                                       "CAN_acw_support":  "CAN_ACW_SUPPORT_NONE",
+                                                       "CAN_acw_alaska":  "CAN_ACW_ALASKA_NO_INTERVENE",
+                                                       "CAN_acw_new_england":  "CAN_ACW_NEW_ENGLAND_NOT_TAKE",
+                                                       "MEX_path":  "MEX_PATH_NATPOP",
+                                                       "allow_wargoals":  "ALWAYS_FREE"
+                                                   },
+                                         "has_save":  true
+                                     },
+                         "1.13.7":  {
+                                        "save_version":  101,
+                                        "rules":  {
+                                                      "USA_civil_war":  "USA_CIVIL_WAR_FOUR_SIDES",
+                                                      "CAN_acw_intervene":  "CAN_ACW_INTERVENE_NO",
+                                                      "CAN_acw_support":  "CAN_ACW_SUPPORT_NONE",
+                                                      "CAN_acw_alaska":  "CAN_ACW_ALASKA_NO_INTERVENE",
+                                                      "CAN_acw_new_england":  "CAN_ACW_NEW_ENGLAND_NOT_TAKE",
+                                                      "MEX_path":  "MEX_PATH_NATPOP",
+                                                      "allow_wargoals":  "ALWAYS_FREE"
+                                                  },
+                                        "has_save":  true
+                                    },
+                         "1.14.10":  {
+                                         "save_version":  130,
+                                         "rules":  {
+                                                       "USA_civil_war":  "USA_CIVIL_WAR_FOUR_SIDES",
+                                                       "CAN_acw_intervene":  "CAN_ACW_INTERVENE_NO",
+                                                       "CAN_acw_support":  "CAN_ACW_SUPPORT_NONE",
+                                                       "CAN_acw_alaska":  "CAN_ACW_ALASKA_NO_INTERVENE",
+                                                       "CAN_acw_new_england":  "CAN_ACW_NEW_ENGLAND_NOT_TAKE",
+                                                       "MEX_path":  "MEX_PATH_NATPOP",
+                                                       "allow_wargoals":  "ALWAYS_FREE"
+                                                   },
+                                         "has_save":  true
+                                     },
+                         "1.15.4":  {
+                                        "save_version":  143,
+                                        "rules":  {
+                                                      "USA_civil_war":  "USA_CIVIL_WAR_FOUR_SIDES",
+                                                      "CAN_acw_intervene":  "CAN_ACW_INTERVENE_NO",
+                                                      "CAN_acw_support":  "CAN_ACW_SUPPORT_NONE",
+                                                      "CAN_acw_alaska":  "CAN_ACW_ALASKA_NO_INTERVENE",
+                                                      "CAN_acw_new_england":  "CAN_ACW_NEW_ENGLAND_NOT_TAKE",
+                                                      "MEX_path":  "MEX_PATH_NATPOP",
+                                                      "allow_wargoals":  "ALWAYS_FREE"
+                                                  },
+                                        "has_save":  true
+                                    },
+                         "1.16.10":  {
+                                         "save_version":  152,
+                                         "rules":  {
+                                                       "USA_civil_war":  "USA_CIVIL_WAR_FOUR_SIDES",
+                                                       "CAN_acw_intervene":  "CAN_ACW_INTERVENE_NO",
+                                                       "CAN_acw_support":  "CAN_ACW_SUPPORT_NONE",
+                                                       "CAN_acw_alaska":  "CAN_ACW_ALASKA_NO_INTERVENE",
+                                                       "CAN_acw_new_england":  "CAN_ACW_NEW_ENGLAND_NOT_TAKE",
+                                                       "MEX_path":  "MEX_PATH_NATPOP",
+                                                       "allow_wargoals":  "ALWAYS_FREE"
+                                                   },
+                                         "has_save":  true
+                                     },
+                         "1.17.5.2":  {
+                                          "save_version":  162,
+                                          "rules":  {
+                                                        "USA_civil_war":  "USA_CIVIL_WAR_FOUR_SIDES",
+                                                        "CAN_acw_intervene":  "CAN_ACW_INTERVENE_NO",
+                                                        "CAN_acw_support":  "CAN_ACW_SUPPORT_NONE",
+                                                        "CAN_acw_alaska":  "CAN_ACW_ALASKA_NO_INTERVENE",
+                                                        "CAN_acw_new_england":  "CAN_ACW_NEW_ENGLAND_NOT_TAKE",
+                                                        "MEX_path":  "MEX_PATH_NATPOP",
+                                                        "allow_wargoals":  "ALWAYS_FREE"
+                                                    },
+                                          "has_save":  true
+                                      },
+                         "1.18.3.0":  {
+                                          "save_version":  163,
+                                          "rules":  {
+                                                        "USA_civil_war":  "USA_CIVIL_WAR_FOUR_SIDES",
+                                                        "CAN_acw_intervene":  "CAN_ACW_INTERVENE_NO",
+                                                        "CAN_acw_support":  "CAN_ACW_SUPPORT_NONE",
+                                                        "CAN_acw_alaska":  "CAN_ACW_ALASKA_NO_INTERVENE",
+                                                        "CAN_acw_new_england":  "CAN_ACW_NEW_ENGLAND_NOT_TAKE",
+                                                        "MEX_path":  "MEX_PATH_NATPOP",
+                                                        "allow_wargoals":  "ALWAYS_FREE"
+                                                    },
+                                          "has_save":  true
+                                      },
+                         "1.19.1.0":  {
+                                          "save_version":  164,
+                                          "rules":  {
+                                                        "USA_civil_war":  "USA_CIVIL_WAR_FOUR_SIDES",
+                                                        "CAN_acw_intervene":  "CAN_ACW_INTERVENE_NO",
+                                                        "CAN_acw_support":  "CAN_ACW_SUPPORT_NONE",
+                                                        "CAN_acw_alaska":  "CAN_ACW_ALASKA_NO_INTERVENE",
+                                                        "CAN_acw_new_england":  "CAN_ACW_NEW_ENGLAND_NOT_TAKE",
+                                                        "MEX_path":  "MEX_PATH_NATPOP",
+                                                        "allow_wargoals":  "ALWAYS_FREE"
+                                                    },
+                                          "has_save":  true
+                                      },
+                         "public":  {
+                                        "save_version":  170,
+                                        "rules":  {
+                                                      "USA_civil_war":  "USA_CIVIL_WAR_FOUR_SIDES",
+                                                      "CAN_acw_intervene":  "CAN_ACW_INTERVENE_NO",
+                                                      "CAN_acw_support":  "CAN_ACW_SUPPORT_NONE",
+                                                      "CAN_acw_alaska":  "CAN_ACW_ALASKA_NO_INTERVENE",
+                                                      "CAN_acw_new_england":  "CAN_ACW_NEW_ENGLAND_NOT_TAKE",
+                                                      "MEX_path":  "MEX_PATH_NATPOP",
+                                                      "allow_wargoals":  "ALWAYS_FREE"
+                                                  },
+                                        "has_save":  true
+                                    }
+                     }
+    }
+]
