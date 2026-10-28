@@ -13,7 +13,7 @@ Get the files from the **[latest release](../../releases/latest)**:
 | File | What it is |
 |---|---|
 | `Kaiserreich-Collection-1.4.zip` | **Everything in one file (15 MB).** Right-click > *Extract All*, then run `Kaiserreich Collection.exe` from the extracted folder. |
-| `Kaiserreich Collection.exe` | Or just the launcher (about 4 MB). Sets itself up the first time you run it. |
+| `Kaiserreich.Collection.exe` | Or just the launcher (about 4 MB). Sets itself up the first time you run it. |
 | `ACW-saves-1-of-2.7z`, `ACW-saves-2-of-2.7z` | *Optional, already in the zip:* ready saves for the **ACW: MacArthur** custom game. Leave them in your Downloads folder or next to the launcher and it picks them up on its own, with no unpacking needed. |
 
 You need Windows 10 or 11, Steam, and Hearts of Iron IV on Steam.
