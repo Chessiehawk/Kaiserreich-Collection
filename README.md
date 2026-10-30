@@ -8,7 +8,13 @@ Old Kaiserreich releases only work on the HOI4 patch they were built for, and St
 
 ## Download
 
-Get the files from the **[latest release](../../releases/latest)**:
+### ⬇️ [Download Kaiserreich Collection 1.4 (zip, 15 MB)](https://github.com/Chessiehawk/Kaiserreich-Collection/releases/latest/download/Kaiserreich-Collection-1.4.zip)
+
+Right-click the zip > **Extract All**, open the folder and double-click **`Kaiserreich Collection.exe`**. That's the launcher.
+
+Downloaded this whole page with the green **Code > Download ZIP** button instead? That works too: the launcher `Kaiserreich Collection.exe` and the two ACW save packs are in the top folder of it.
+
+All the files are also on the **[release page](../../releases/latest)**:
 
 | File | What it is |
 |---|---|

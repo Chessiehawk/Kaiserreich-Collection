@@ -12,6 +12,7 @@ $skip = @("$proj\src\", "$proj\dist\", "$proj\scenario_saves\", "$proj\.git\", "
 foreach ($f in Get-ChildItem $proj -Recurse -File) {
     if ($skip | Where-Object { $f.FullName.StartsWith($_) }) { continue }
     if ($f.Name -in 'icon_256.png', 'README.md', 'LICENSE', '.gitignore', '.gitattributes') { continue }   # GitHub-only files
+    if ($f.Name -eq 'Kaiserreich Collection.exe' -or $f.Name -like 'ACW-saves-*.7z') { continue }   # ready-to-run copies kept in the repo root
     $name = $f.FullName.Substring($proj.Length + 1) -replace '\\', '/'
     $rsp += "`"/resource:$($f.FullName),$name`""; $count++
 }
@@ -20,4 +21,5 @@ $rsp += "`"$PSScriptRoot\CollectionGui.cs`""; $rsp += "`"$PSScriptRoot\Wasd.cs`"
 & $csc "@$out\build.rsp"
 if ($LASTEXITCODE -ne 0) { throw "csc failed ($LASTEXITCODE)" }
 Remove-Item "$out\build.rsp" -Force
+Copy-Item $exe "$proj\Kaiserreich Collection.exe" -Force   # so a plain "Download ZIP" of the repo has the launcher too
 Write-Host ("exe: {0} KB, {1} embedded files" -f [math]::Round((Get-Item $exe).Length / 1KB), $count)
