@@ -8,9 +8,11 @@ Old Kaiserreich releases only work on the HOI4 patch they were built for, and St
 
 ## Download
 
-### ⬇️ [Download Kaiserreich Collection 1.4 (zip, 15 MB)](https://github.com/Chessiehawk/Kaiserreich-Collection/releases/latest/download/Kaiserreich-Collection-1.4.zip)
+### ⬇️ [Download Kaiserreich Collection 1.4.1 (zip, 15 MB)](https://github.com/Chessiehawk/Kaiserreich-Collection/releases/latest/download/Kaiserreich-Collection-1.4.1.zip)
 
 Right-click the zip > **Extract All**, open the folder and double-click **`Kaiserreich Collection.exe`**. That's the launcher.
+
+> **Have 1.4?** It was broken: every button ended in *"Something went wrong - read the log, fix it, and try again."* Download 1.4.1 and run it once. It replaces the installed launcher and moves the old 1.4 files from your Downloads and Desktop to the Recycle Bin. Your installed game versions stay.
 
 Downloaded this whole page with the green **Code > Download ZIP** button instead? That works too: the launcher `Kaiserreich Collection.exe` and the two ACW save packs are in the top folder of it.
 
@@ -18,7 +20,7 @@ All the files are also on the **[release page](../../releases/latest)**:
 
 | File | What it is |
 |---|---|
-| `Kaiserreich-Collection-1.4.zip` | **Everything in one file (15 MB).** Right-click > *Extract All*, then run `Kaiserreich Collection.exe` from the extracted folder. |
+| `Kaiserreich-Collection-1.4.1.zip` | **Everything in one file (15 MB).** Right-click > *Extract All*, then run `Kaiserreich Collection.exe` from the extracted folder. |
 | `Kaiserreich.Collection.exe` | Or just the launcher (about 4 MB). Sets itself up the first time you run it. |
 | `ACW-saves-1-of-2.7z`, `ACW-saves-2-of-2.7z` | *Optional, already in the zip:* ready saves for the **ACW: MacArthur** custom game. Leave them in your Downloads folder or next to the launcher and it picks them up on its own, with no unpacking needed. |
 
@@ -72,6 +74,7 @@ HOI4 1.5 is the oldest version Steam still offers, so Kaiserreich releases older
 - **Player-Led Peace add-on.** An optional tile for HOI4 1.10, 1.11 and 1.19 that lets players run peace conferences themselves.
 - **WASD map movement.** W/A/S/D scroll the map like the arrow keys while the game is in front. F11 turns it off and on.
 - **Clear cache** and **Uninstall** buttons. Uninstall is also in Windows Settings > Apps.
+- **Cleans up old downloads.** On start, older copies of this launcher and old `Kaiserreich-Collection-<version>.zip` downloads in your Downloads folder, on your Desktop or next to the launcher (and one folder down) go to the Recycle Bin, so an old copy can't put an old version back. It checks each exe's built-in program name and version, never just the file name. Game versions, mods and saves are never touched.
 
 ## Windows warnings
 

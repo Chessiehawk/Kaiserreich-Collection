@@ -160,6 +160,7 @@ class CollectionForm : Form
             LoadLastChoice(); RefreshReady();
             ImportSavePacks();
             FirstStartSetup();
+            RemoveOldLaunchers(Path.GetDirectoryName(Application.ExecutablePath), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"), Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
             foreach (var a in args) {
                 if (a.Equals("/uninstall", StringComparison.OrdinalIgnoreCase)) { ConfirmUninstall(); }   // from Windows Settings > Apps
                 else if (a.StartsWith("/autoplay:", StringComparison.OrdinalIgnoreCase) || a.StartsWith("/autoinstall:", StringComparison.OrdinalIgnoreCase)) {
@@ -461,7 +462,56 @@ class CollectionForm : Form
         }
     }
 
+    // Older copies of this launcher left in Downloads/Desktop (or in an extracted zip one folder down) would put their old
+    // engine back if double-clicked again, so they go to the Recycle Bin. Only files that really are this program
+    // (assembly "Kaiserreich Collection") with a lower version count, plus release zips by the version in their name.
+    void RemoveOldLaunchers(params string[] tops)
+    {
+        Version mine = FullVersion(Assembly.GetExecutingAssembly().GetName().Version);
+        string self = Path.GetFullPath(Application.ExecutablePath), home = Path.GetFullPath(Path.Combine(HomeDir(), "Kaiserreich Collection.exe"));
+        var places = new List<string>();
+        foreach (var top in tops) {
+            if (string.IsNullOrEmpty(top) || !Directory.Exists(top) || places.Contains(top)) continue;
+            places.Add(top);
+            try { places.AddRange(Directory.GetDirectories(top)); } catch { }
+        }
+        var zipName = new Regex(@"^Kaiserreich-Collection-(\d+(?:\.\d+){1,3})(?: \(\d+\))?\.zip$", RegexOptions.IgnoreCase);
+        foreach (var place in places) {
+            string[] files; try { files = Directory.GetFiles(place); } catch { continue; }
+            foreach (var f in files) {
+                string n = Path.GetFileName(f), full = Path.GetFullPath(f), what = null;
+                if (full.Equals(self, StringComparison.OrdinalIgnoreCase) || full.Equals(home, StringComparison.OrdinalIgnoreCase)) continue;
+                if (n.StartsWith("Kaiserreich", StringComparison.OrdinalIgnoreCase) && n.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) {
+                    try { var an = AssemblyName.GetAssemblyName(f); if (an.Name == "Kaiserreich Collection" && FullVersion(an.Version) < mine) what = "old launcher (v" + an.Version + ")"; } catch { }   // not a .NET exe: not ours
+                } else {
+                    var m = zipName.Match(n); if (m.Success && FullVersion(new Version(m.Groups[1].Value)) < mine) what = "old download";
+                }
+                if (what == null) continue;
+                try { using (File.Open(f, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { } } catch { continue; }   // in use or read-only: leave it (no error popups)
+                try {
+                    Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(f, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                    Append("Moved " + what + " to the Recycle Bin: " + f);
+                } catch { }
+            }
+        }
+    }
+    static Version FullVersion(Version v) { return new Version(v.Major, v.Minor, Math.Max(v.Build, 0), Math.Max(v.Revision, 0)); }   // "1.4.1" == 1.4.1.0
+
     void SetBusy(bool busy) { playBtn.Enabled = installBtn.Enabled = installAllBtn.Enabled = cacheBtn.Enabled = dlcBtn.Enabled = !busy; foreach (var t in verTiles) t.Enabled = !busy; }
+
+    // The engine's command line (its own method so it can be checked without starting anything).
+    // RemoteSigned runs our own local scripts; "Bypass" is what malware uses.
+    string EngineArgs(string mode)
+    {
+        string a = "-NoProfile -ExecutionPolicy RemoteSigned -File \"" + Path.Combine(HomeDir(), "Kaiserreich-Collection.ps1") + "\" -NoPause -Branch " + sel.Branch
+                 + (tPlpc.On ? " -Plpc" : " -NoPlpc") + (cbWasd.Checked ? "" : " -NoWasd") + ScenarioArgs() + DlcArgs() + " -ShortcutTarget \"" + exePath + "\"";
+        if (mode == "install") a += " -Install";
+        if (mode == "installall") a += " -InstallAll";
+        if (mode == "cache") a += " -ClearCache";
+        if (mode == "uninstall") { a += " -Uninstall"; foreach (var x in args) if (x.Equals("/dryrun", StringComparison.OrdinalIgnoreCase)) a += " -DryRun"; }
+        foreach (var x in args) if (x.Equals("/nolaunch", StringComparison.OrdinalIgnoreCase)) a += " -NoLaunch";
+        return a;
+    }
 
     void Run(string mode)
     {
@@ -472,16 +522,8 @@ class CollectionForm : Form
         try { Deploy(); SaveLastChoice(); }
         catch (Exception ex) { Append("ERROR unpacking files: " + ex.Message); SetBusy(false); return; }
 
-        string a = "-NoProfile -ExecutionPolicy RemoteSigned -File \""   // RemoteSigned runs our own local scripts; "Bypass" is what malware uses + Path.Combine(HomeDir(), "Kaiserreich-Collection.ps1") + "\" -NoPause -Branch " + sel.Branch
-                 + (tPlpc.On ? " -Plpc" : " -NoPlpc") + (cbWasd.Checked ? "" : " -NoWasd") + ScenarioArgs() + DlcArgs() + " -ShortcutTarget \"" + exePath + "\"";
-        if (mode == "install") a += " -Install";
-        if (mode == "installall") a += " -InstallAll";
-        if (mode == "cache") a += " -ClearCache";
-        if (mode == "uninstall") { a += " -Uninstall"; foreach (var x in args) if (x.Equals("/dryrun", StringComparison.OrdinalIgnoreCase)) a += " -DryRun"; }
-        foreach (var x in args) if (x.Equals("/nolaunch", StringComparison.OrdinalIgnoreCase)) a += " -NoLaunch";
-
         proc = new Process();
-        proc.StartInfo = new ProcessStartInfo("powershell.exe", a) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, WorkingDirectory = HomeDir() };
+        proc.StartInfo = new ProcessStartInfo("powershell.exe", EngineArgs(mode)) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, WorkingDirectory = HomeDir() };
         proc.EnableRaisingEvents = true;
         proc.OutputDataReceived += (s, e) => { if (e.Data != null) Append(e.Data); };
         proc.ErrorDataReceived += (s, e) => { if (e.Data != null) Append(e.Data); };

@@ -6,7 +6,7 @@ Copy-Item "$PSScriptRoot\AppInfoParser.cs" "$proj\AppInfoParser.cs" -Force
 $exe = "$out\Kaiserreich Collection.exe"
 $csc = "$env:windir\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 if (-not (Test-Path $csc)) { $csc = "$env:windir\Microsoft.NET\Framework\v4.0.30319\csc.exe" }
-$rsp = @('/nologo', '/target:winexe', '/optimize+', "`"/out:$exe`"", "`"/win32icon:$proj\KaiserreichCollection.ico`"", "`"/win32manifest:$PSScriptRoot\app.manifest`"",'/r:System.Windows.Forms.dll', '/r:System.Drawing.dll')
+$rsp = @('/nologo', '/target:winexe', '/optimize+', "`"/out:$exe`"", "`"/win32icon:$proj\KaiserreichCollection.ico`"", "`"/win32manifest:$PSScriptRoot\app.manifest`"",'/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:Microsoft.VisualBasic.dll')
 $count = 0
 $skip = @("$proj\src\", "$proj\dist\", "$proj\scenario_saves\", "$proj\.git\", "$proj\docs\")   # ready saves travel as separate save packs (Discord 10 MB limit)
 foreach ($f in Get-ChildItem $proj -Recurse -File) {

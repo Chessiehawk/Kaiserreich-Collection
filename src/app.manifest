@@ -2,7 +2,7 @@
 <!-- Standard Windows application manifest: says what the program is, that it runs as the normal user (never asks for
      admin) and which Windows versions it was made for. Programs without one look less like ordinary software. -->
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
-  <assemblyIdentity version="1.4.0.0" processorArchitecture="msil" name="KaiserreichCollection.Launcher" type="win32" />
+  <assemblyIdentity version="1.4.1.0" processorArchitecture="msil" name="KaiserreichCollection.Launcher" type="win32" />
   <description>Kaiserreich Collection - launcher for old Kaiserreich releases on their matching Hearts of Iron IV versions</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
