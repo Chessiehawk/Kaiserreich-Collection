@@ -8,7 +8,7 @@ Old Kaiserreich releases only work on the HOI4 patch they were built for, and St
 
 ## Download
 
-### ⬇️ [Download Kaiserreich Collection 1.4.2 (zip, 15 MB)](https://github.com/Chessiehawk/Kaiserreich-Collection/releases/latest/download/Kaiserreich-Collection-1.4.2.zip)
+### ⬇️ [Download Kaiserreich Collection 1.4.3 (zip, 15 MB)](https://github.com/Chessiehawk/Kaiserreich-Collection/releases/latest/download/Kaiserreich-Collection-1.4.3.zip)
 
 Right-click the zip > **Extract All**, open the folder and double-click **`Kaiserreich Collection.exe`**. That's the launcher.
 
@@ -20,7 +20,7 @@ All the files are also on the **[release page](../../releases/latest)**:
 
 | File | What it is |
 |---|---|
-| `Kaiserreich-Collection-1.4.2.zip` | **Everything in one file (15 MB).** Right-click > *Extract All*, then run `Kaiserreich Collection.exe` from the extracted folder. |
+| `Kaiserreich-Collection-1.4.3.zip` | **Everything in one file (15 MB).** Right-click > *Extract All*, then run `Kaiserreich Collection.exe` from the extracted folder. |
 | `Kaiserreich.Collection.exe` | Or just the launcher (about 4 MB). Sets itself up the first time you run it. |
 | `ACW-saves-1-of-2.7z`, `ACW-saves-2-of-2.7z` | *Optional, already in the zip:* ready saves for the **ACW: MacArthur** custom game. Leave them in your Downloads folder or next to the launcher and it picks them up on its own, with no unpacking needed. |
 
@@ -72,7 +72,7 @@ HOI4 1.5 is the oldest version Steam still offers, so Kaiserreich releases older
   - start fresh: *Custom Game Rules > Load Preset > "American Civil War - MacArthur"*, or
   - skip ahead: *Load Game > "ACW_MacArthur_KR_&lt;version&gt;"*. This is a ready save as MacArthur's USA at the moment the country breaks apart, and it is put at the top of the save list. Every version has one. Kaiserreich 0.8.4a and 0.9.1 have no civil-war game rule, so for them it is save-only.
 - **Player-Led Peace add-on.** An optional tile for HOI4 1.10, 1.11 and 1.19 that lets players run peace conferences themselves.
-- **WASD map movement** (optional, tick it under PLAY). W/A/S/D scroll the map like the arrow keys while the game is in front. Opening the console (the key under Esc) pauses it so you can type commands; closing the console or Esc brings it back. For chat and save names, F11 turns it off and on.
+- **WASD map movement** (optional, tick it under PLAY). Hold W/A/S/D to scroll the map like the arrow keys. Until you first hold one, and again after every Esc (the menu and the save screen), a quick tap types the letter instead, so names in the menus and save names work. The console (the key under Esc) pauses it while it is open. F11 turns it off and on (for chat).
 - **Clear cache** and **Uninstall** buttons. Uninstall is also in Windows Settings > Apps.
 - **Cleans up old downloads.** On start, older copies of this launcher and old `Kaiserreich-Collection-<version>.zip` downloads in your Downloads folder, on your Desktop or next to the launcher (and one folder down) go to the Recycle Bin, so an old copy can't put an old version back. It checks each exe's built-in program name and version, never just the file name. Game versions, mods and saves are never touched.
 
@@ -108,7 +108,7 @@ powershell -ExecutionPolicy Bypass -File src\release\make_release.ps1   # -> the
 |---|---|
 | `Kaiserreich-Collection.ps1` | The engine: installs, launches, restores, uninstalls. |
 | `src\CollectionGui.cs` | The launcher window. Everything in the project folder gets embedded into the exe. |
-| `src\Wasd.cs` | WASD map movement (low-level keyboard hook, active only while HOI4 is in front; paused while the console is open). |
+| `src\Wasd.cs` | WASD map movement (low-level keyboard hook, active only while HOI4 is in front; standby until a key is held and after Esc, paused while the console is open). |
 | `src\stress_test.ps1` | Headless release test: every version x every button, a real uninstall dry run, the old-copy cleanup, the WASD keys. Starts no game and presses no real keys. |
 | `src\release\` | The README that goes in the downloads, and `make_release.ps1`, which packs them. |
 | `src\build_versions.ps1` | Generates `versions.json` / `versions.txt`: which HOI4 branch goes with which Kaiserreich, plus the DLC per version. |

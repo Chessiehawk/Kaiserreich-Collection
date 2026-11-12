@@ -2,8 +2,11 @@
 // Runs as "<launcher>.exe /wasd", started by the engine right after the game starts; ends on its own once no
 // hoi4.exe has been running for a short while. Only while a hoi4.exe window is in front:
 //   W/A/S/D (no Shift/Ctrl/Alt)  ->  Up/Left/Down/Right arrow keys
-//   console key (under Esc)      ->  the game's console opens: W/A/S/D type letters until it is pressed again or Esc
-//   F11                          ->  turns WASD off/on (to type names or chat, or use the W/A/S/D hotkeys)
+//   standby                      ->  from the start (main menu, lobby, picking a country) and after every Esc (the save
+//                                    screen is behind Esc): a quick tap types the letter, holding the key for a moment
+//                                    starts panning and ends standby
+//   console key (under Esc)      ->  the game's console opens: W/A/S/D type letters until it is pressed again
+//   F11                          ->  turns WASD off/on (e.g. for chat)
 // Everything else, and every other program, is left alone.
 //
 // Windows silently removes a low-level keyboard hook that answers too slowly (easy while HOI4 loads and eats the
@@ -40,15 +43,22 @@ static class Wasd
 
     const int WH_KEYBOARD_LL = 13, VK_F11 = 0x7A, VK_ESCAPE = 0x1B;
     const uint SCAN_CONSOLE = 0x29;          // the key under Esc (` ~ on US keyboards, ^ on German ones), by position not letter
-    const uint LLKHF_INJECTED = 0x10, LLKHF_UP = 0x80, KEYEVENTF_EXTENDEDKEY = 0x1, KEYEVENTF_KEYUP = 0x2;
+    const uint LLKHF_EXTENDED = 0x01, LLKHF_INJECTED = 0x10, LLKHF_UP = 0x80, KEYEVENTF_EXTENDEDKEY = 0x1, KEYEVENTF_KEYUP = 0x2;
+    const int HOLD_MS = 250;                 // in standby a key held this long means "pan"; typing taps are shorter
+
+    class Pend { public uint Vk; public ushort Scan; public int Since; }
 
     static IntPtr hook = IntPtr.Zero, hMod = IntPtr.Zero;
     static HookProc proc;                    // kept in a field so the garbage collector can't free it
     static bool enabled = true;
+    static bool standby = true;              // main menu / lobby / after Esc: taps are letters, a hold starts panning
     static bool typing, consoleKeyDown;      // console open: W/A/S/D are letters (key repeat doesn't flip it back)
-    static Action<ushort, ushort, bool> send = SendKey;   // swappable so the stress test can watch without pressing real keys
     static volatile bool hoiFront;           // set by a timer - never worked out inside the hook
-    static readonly HashSet<uint> held = new HashSet<uint>();   // W/A/S/D keys whose arrow is currently pressed
+    static readonly HashSet<uint> held = new HashSet<uint>();        // W/A/S/D keys whose arrow is currently pressed
+    static readonly List<Pend> pending = new List<Pend>();           // standby: pressed, not yet known if tap or hold
+    static readonly HashSet<uint> swallowUp = new HashSet<uint>();   // already typed as a letter: drop the real key-up
+    static Action<ushort, ushort, bool, bool> send = SendKey;       // swappable so the stress test can watch without pressing real keys
+    static Func<int> now = () => Environment.TickCount;              // swappable for the stress test's clock
     static readonly INPUT[] one = new INPUT[1];
     static readonly int inputSize = Marshal.SizeOf(typeof(INPUT));
     static uint lastPid; static bool lastIsHoi;
@@ -71,9 +81,13 @@ static class Wasd
         var front = new System.Windows.Forms.Timer { Interval = 150 };
         front.Tick += (s, e) => UpdateFront();
         front.Start();
+        // standby: a key that is still down after HOLD_MS starts panning (without waiting for Windows' key repeat)
+        var hold = new System.Windows.Forms.Timer { Interval = 50 };
+        hold.Tick += (s, e) => CheckPending();
+        hold.Start();
         // re-install the hook now and then: Windows may have dropped it without telling us
         var rehook = new System.Windows.Forms.Timer { Interval = 30000 };
-        rehook.Tick += (s, e) => { if (held.Count == 0) Install(); };
+        rehook.Tick += (s, e) => { if (held.Count == 0 && pending.Count == 0) Install(); };
         rehook.Start();
         // stay while the game runs: quit after ~20 s without any hoi4.exe (or 4 min if it never showed up)
         DateTime start = DateTime.Now, lastSeen = DateTime.MinValue;
@@ -81,7 +95,7 @@ static class Wasd
         life.Tick += (s, e) => {
             if (Process.GetProcessesByName("hoi4").Length > 0) lastSeen = DateTime.Now;
             bool gone = lastSeen == DateTime.MinValue ? (DateTime.Now - start).TotalMinutes > 4 : (DateTime.Now - lastSeen).TotalSeconds > 20;
-            if (gone) { life.Stop(); front.Stop(); rehook.Stop(); Application.ExitThread(); }
+            if (gone) { life.Stop(); front.Stop(); hold.Stop(); rehook.Stop(); Application.ExitThread(); }
         };
         life.Start();
         Application.Run();
@@ -107,6 +121,7 @@ static class Wasd
             lastPid = pid; lastIsHoi = isHoi;
         }
         hoiFront = lastIsHoi;
+        if (!hoiFront && pending.Count > 0) { foreach (var p in pending) swallowUp.Add(p.Vk); pending.Clear(); }   // switched away mid-press: type nothing
     }
     static bool Down(int vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; }
 
@@ -122,18 +137,37 @@ static class Wasd
         }
         return false;
     }
-    static void SendKey(ushort vk, ushort scan, bool up)
+    static void SendKey(ushort vk, ushort scan, bool up, bool extended)
     {
         one[0].type = 1;
-        one[0].u.ki = new KEYBDINPUT { wVk = vk, wScan = scan, dwFlags = KEYEVENTF_EXTENDEDKEY | (up ? KEYEVENTF_KEYUP : 0) };
+        one[0].u.ki = new KEYBDINPUT { wVk = vk, wScan = scan, dwFlags = (extended ? KEYEVENTF_EXTENDEDKEY : 0) | (up ? KEYEVENTF_KEYUP : 0) };
         SendInput(1, one, inputSize);
     }
     static void ReleaseHeld()
     {
         ushort avk, scan;
-        foreach (uint vk in new List<uint>(held)) { if (Arrow(vk, out avk, out scan)) send(avk, scan, true); }
+        foreach (uint vk in new List<uint>(held)) { if (Arrow(vk, out avk, out scan)) send(avk, scan, true, true); }
         held.Clear();
     }
+    // standby keys that turned out to be typing: type them as plain letters, in the order they were pressed.
+    // A key still physically down gets its real key-up dropped later (its letter is already complete).
+    static void TypePending(uint releasing)
+    {
+        foreach (var p in pending) {
+            send((ushort)p.Vk, p.Scan, false, false); send((ushort)p.Vk, p.Scan, true, false);
+            if (p.Vk != releasing) swallowUp.Add(p.Vk);
+        }
+        pending.Clear();
+    }
+    // standby keys that turned out to be held: pan, and leave standby
+    static void StartPan()
+    {
+        ushort avk, scan;
+        foreach (var p in pending) { if (Arrow(p.Vk, out avk, out scan)) { held.Add(p.Vk); send(avk, scan, false, true); } }
+        pending.Clear(); standby = false;
+    }
+    static int PendingIndex(uint vk) { for (int i = 0; i < pending.Count; i++) if (pending[i].Vk == vk) return i; return -1; }
+    static void CheckPending() { if (pending.Count > 0 && now() - pending[0].Since >= HOLD_MS) StartPan(); }
 
     static IntPtr Callback(int nCode, IntPtr wParam, IntPtr lParam)
     {
@@ -141,29 +175,45 @@ static class Wasd
             var k = (KBDLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(KBDLLHOOKSTRUCT));
             bool injected = (k.flags & LLKHF_INJECTED) != 0, up = (k.flags & LLKHF_UP) != 0;
             ushort avk, scan;
-            // the console key opens and closes the game's console; Esc closes it (and menus) - always "back to the map".
-            // Both keys still go on to the game.
-            if (!injected && k.scanCode == SCAN_CONSOLE) {
-                if (up) consoleKeyDown = false;
-                else if (!consoleKeyDown && hoiFront) { consoleKeyDown = true; typing = !typing; if (typing) ReleaseHeld(); }
-            }
-            if (!injected && !up && k.vkCode == VK_ESCAPE && hoiFront) typing = false;
-            if (!injected && Arrow(k.vkCode, out avk, out scan)) {
-                // a key we turned into an arrow is always released as that arrow, so nothing gets stuck
-                if (up && held.Remove(k.vkCode)) { send(avk, scan, true); return (IntPtr)1; }
-                if (!up && held.Contains(k.vkCode)) { send(avk, scan, false); return (IntPtr)1; }   // key repeat
-                if (!up && enabled && !typing && hoiFront && !Down(0x10) && !Down(0x11) && !Down(0x12)) {
-                    held.Add(k.vkCode); send(avk, scan, false); return (IntPtr)1;
+            if (!injected) {
+                bool wasd = Arrow(k.vkCode, out avk, out scan);
+                bool plain = enabled && !typing && hoiFront && !Down(0x10) && !Down(0x11) && !Down(0x12);
+                // another key while standby keys wait: they were typing - type them first, then this key, in that order
+                bool replay = !up && pending.Count > 0 && !(wasd && plain && standby);
+                if (replay) TypePending(0);
+
+                // the console key opens and closes the game's console; Esc closes the console and menus and opens the
+                // menu with the save screen - standby. Both keys still go on to the game.
+                if (k.scanCode == SCAN_CONSOLE) {
+                    if (up) consoleKeyDown = false;
+                    else if (!consoleKeyDown && hoiFront) { consoleKeyDown = true; typing = !typing; if (typing) ReleaseHeld(); else standby = false; }
                 }
-            }
-            if (!injected && k.vkCode == VK_F11 && hoiFront) {
-                if (!up) {
-                    enabled = !enabled;
-                    ReleaseHeld();
-                    bool nowOn = enabled;
-                    ThreadPool.QueueUserWorkItem(_ => { if (nowOn) SystemSounds.Asterisk.Play(); else SystemSounds.Hand.Play(); });
+                if (!up && k.vkCode == VK_ESCAPE && hoiFront) { ReleaseHeld(); typing = false; standby = true; }
+
+                if (k.vkCode == VK_F11 && hoiFront) {
+                    if (!up) {
+                        enabled = !enabled; standby = false;
+                        ReleaseHeld();
+                        bool nowOn = enabled;
+                        ThreadPool.QueueUserWorkItem(_ => { if (nowOn) SystemSounds.Asterisk.Play(); else SystemSounds.Hand.Play(); });
+                    }
+                    return (IntPtr)1;
                 }
-                return (IntPtr)1;
+
+                if (wasd) {
+                    if (up && swallowUp.Remove(k.vkCode)) return (IntPtr)1;                        // its letter was already typed
+                    // a key we turned into an arrow is always released as that arrow, so nothing gets stuck
+                    if (up && held.Remove(k.vkCode)) { send(avk, scan, true, true); return (IntPtr)1; }
+                    int pi = PendingIndex(k.vkCode);
+                    if (up && pi >= 0) { TypePending(k.vkCode); return (IntPtr)1; }                // a quick tap: the letter
+                    if (!up && pi >= 0) { if (now() - pending[pi].Since >= HOLD_MS) StartPan(); return (IntPtr)1; }   // key repeat while waiting
+                    if (!up && held.Contains(k.vkCode)) { send(avk, scan, false, true); return (IntPtr)1; }       // key repeat
+                    if (!up && plain) {
+                        if (standby) { pending.Add(new Pend { Vk = k.vkCode, Scan = (ushort)k.scanCode, Since = now() }); return (IntPtr)1; }
+                        held.Add(k.vkCode); send(avk, scan, false, true); return (IntPtr)1;
+                    }
+                }
+                if (replay) { send((ushort)k.vkCode, (ushort)k.scanCode, false, (k.flags & LLKHF_EXTENDED) != 0); return (IntPtr)1; }
             }
         }
         return CallNextHookEx(hook, nCode, wParam, lParam);

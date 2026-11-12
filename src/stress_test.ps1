@@ -145,59 +145,91 @@ foreach ($k in $expect.Keys) {
 "3. cleanup: $($expect.Count) files, $(@($expect.Values | Where-Object { $_ }).Count) should go to the Recycle Bin, wrong: $bad, took $($sw.ElapsedMilliseconds) ms"
 
 # ---------- 4. WASD key handling ----------
+# SendInput is swapped for a recorder and the clock for a fake one. Recorded as <vk><v=down|^=up>[x=extended].
+# (Shift/Ctrl/Alt are read from the real keyboard, so don't hold them while this runs.)
 $wasdType = $asm.GetType('Wasd'); function WF($name) { $wasdType.GetField($name, $bf) }
-$script:sent = New-Object Collections.Generic.List[string]
-(WF 'send').SetValue($null, [Action[uint16, uint16, bool]] { param($vk, $scan, $up) $script:sent.Add(('{0:X2}{1}' -f $vk, $(if ($up) { '^' } else { 'v' }))) })
-$cb = $wasdType.GetMethod('Callback', $bf)
+$script:sent = New-Object Collections.Generic.List[string]; $script:clock = 1000
+(WF 'send').SetValue($null, [Action[uint16, uint16, bool, bool]] { param($vk, $scan, $up, $ext) $script:sent.Add(('{0:X2}{1}{2}' -f $vk, $(if ($up) { '^' } else { 'v' }), $(if ($ext) { 'x' } else { '' }))) })
+(WF 'now').SetValue($null, [Func[int]] { $script:clock })
+$cb = $wasdType.GetMethod('Callback', $bf); $check = $wasdType.GetMethod('CheckPending', $bf); $front = $wasdType.GetMethod('UpdateFront', $bf)
 $mem = [Runtime.InteropServices.Marshal]::AllocHGlobal(32)
-function Key([string]$what, [int]$vk, [int]$scan, [bool]$up, [bool]$injected = $false) {
-    [Runtime.InteropServices.Marshal]::WriteInt32($mem, 0, $vk); [Runtime.InteropServices.Marshal]::WriteInt32($mem, 4, $scan)
+function State { if ((WF 'typing').GetValue($null)) { 'console' } elseif ((WF 'standby').GetValue($null)) { 'standby' } else { 'map' } }
+function Key([int[]]$key, [bool]$up, [bool]$injected = $false) {
+    [Runtime.InteropServices.Marshal]::WriteInt32($mem, 0, $key[0]); [Runtime.InteropServices.Marshal]::WriteInt32($mem, 4, $key[1])
     [Runtime.InteropServices.Marshal]::WriteInt32($mem, 8, ($(if ($up) { 0x80 } else { 0 }) -bor $(if ($injected) { 0x10 } else { 0 })))
     [Runtime.InteropServices.Marshal]::WriteInt32($mem, 12, 0); [Runtime.InteropServices.Marshal]::WriteIntPtr($mem, 16, [IntPtr]::Zero)
     $script:sent.Clear()
     $r = $cb.Invoke($null, @([int]0, [IntPtr]$(if ($up) { 0x101 } else { 0x100 }), $mem))
     @{ swallowed = ($r -ne [IntPtr]::Zero); sent = ($script:sent -join ' ') }
 }
-$W = @(0x57, 0x11); $A = @(0x41, 0x1E); $S = @(0x53, 0x1F); $D = @(0x44, 0x20); $C = @(0xC0, 0x29); $E = @(0x1B, 0x01)
+function Tick([int]$ms) { $script:clock += $ms; $script:sent.Clear(); $check.Invoke($null, $null) | Out-Null; @{ swallowed = $true; sent = ($script:sent -join ' ') } }
+$W = @(0x57, 0x11); $A = @(0x41, 0x1E); $S = @(0x53, 0x1F); $D = @(0x44, 0x20); $O = @(0x4F, 0x18); $C = @(0xC0, 0x29); $E = @(0x1B, 0x01)
 (WF 'hoiFront').SetValue($null, $true); (WF 'enabled').SetValue($null, $true); (WF 'typing').SetValue($null, $false)
+if ((State) -ne 'standby') { $fail++; '   FAIL the helper does not start in standby' }
+# name, key (or tick ms), up, swallowed, sent, state after
 $steps = @(
-    @('W down on the map -> Up arrow',              $W, $false, $true,  '26v', $false),
-    @('W held (repeat) -> Up arrow again',          $W, $false, $true,  '26v', $false),
-    @('W up -> Up arrow released',                  $W, $true,  $true,  '26^', $false),
-    @('console key down -> passes, typing starts',  $C, $false, $false, '',    $true),
-    @('console key repeat -> still typing',         $C, $false, $false, '',    $true),
-    @('W down in console -> letter W',              $W, $false, $false, '',    $true),
-    @('W up in console -> letter W',                $W, $true,  $false, '',    $true),
-    @('A down in console -> letter A',              $A, $false, $false, '',    $true),
-    @('A up',                                       $A, $true,  $false, '',    $true),
-    @('console key up',                             $C, $true,  $false, '',    $true),
-    @('console key down -> console closed, map',    $C, $false, $false, '',    $false),
-    @('console key up',                             $C, $true,  $false, '',    $false),
-    @('D down on the map -> Right arrow',           $D, $false, $true,  '27v', $false),
-    @('console key while D held -> Right released', $C, $false, $false, '27^', $true),
-    @('D up afterwards -> passes, nothing stuck',   $D, $true,  $false, '',    $true),
-    @('console key up',                             $C, $true,  $false, '',    $true),
-    @('Esc -> back to the map',                     $E, $false, $false, '',    $false),
-    @('S down -> Down arrow',                       $S, $false, $true,  '28v', $false),
-    @('S up -> Down arrow released',                $S, $true,  $true,  '28^', $false)
+    @('start (menu): W tap down -> waits',               $W, $false, $true,  '',                 'standby'),
+    @('W tap up -> letter w typed',                       $W, $true,  $true,  '57v 57^',          'standby'),
+    @('S down (typing "sa" fast)',                        $S, $false, $true,  '',                 'standby'),
+    @('A down while S still down',                        $A, $false, $true,  '',                 'standby'),
+    @('S up -> s then a typed, in order',                 $S, $true,  $true,  '53v 53^ 41v 41^',  'standby'),
+    @('A up -> dropped (already typed)',                  $A, $true,  $true,  '',                 'standby'),
+    @('D down',                                           $D, $false, $true,  '',                 'standby'),
+    @('O down -> d typed first, then o',                  $O, $false, $true,  '44v 44^ 4Fv',      'standby'),
+    @('D up -> dropped',                                  $D, $true,  $true,  '',                 'standby'),
+    @('O up -> passes',                                   $O, $true,  $false, '',                 'standby'),
+    @('W down',                                           $W, $false, $true,  '',                 'standby'),
+    @('W held 0.1 s -> still waiting',                    100, $null, $true,  '',                 'standby'),
+    @('W held 0.3 s -> panning starts, standby ends',     200, $null, $true,  '26vx',             'map'),
+    @('W repeat -> Up again',                             $W, $false, $true,  '26vx',             'map'),
+    @('W up -> Up released',                              $W, $true,  $true,  '26^x',             'map'),
+    @('A down on the map -> Left at once',                $A, $false, $true,  '25vx',             'map'),
+    @('A up',                                             $A, $true,  $true,  '25^x',             'map'),
+    @('Esc -> standby (menu / save screen)',              $E, $false, $false, '',                 'standby'),
+    @('Esc up',                                           $E, $true,  $false, '',                 'standby'),
+    @('S tap in the save box: down',                      $S, $false, $true,  '',                 'standby'),
+    @('S tap in the save box: up -> letter s',            $S, $true,  $true,  '53v 53^',          'standby'),
+    @('D down (back on the map)',                         $D, $false, $true,  '',                 'standby'),
+    @('D held 0.3 s -> panning',                          300, $null, $true,  '27vx',             'map'),
+    @('D up -> Right released',                           $D, $true,  $true,  '27^x',             'map'),
+    @('W down -> Up',                                     $W, $false, $true,  '26vx',             'map'),
+    @('Esc while panning -> Up released, standby',        $E, $false, $false, '26^x',             'standby'),
+    @('W up afterwards -> passes, nothing stuck',         $W, $true,  $false, '',                 'standby'),
+    @('Esc up',                                           $E, $true,  $false, '',                 'standby'),
+    @('W down, then Esc before deciding',                 $W, $false, $true,  '',                 'standby'),
+    @('Esc -> w typed first, then Esc goes on',           $E, $false, $true,  '57v 57^ 1Bv',      'standby'),
+    @('W up -> dropped',                                  $W, $true,  $true,  '',                 'standby'),
+    @('Esc up -> passes',                                 $E, $true,  $false, '',                 'standby'),
+    @('console key -> console, typing',                   $C, $false, $false, '',                 'console'),
+    @('console key repeat -> still console',              $C, $false, $false, '',                 'console'),
+    @('W in the console: down -> passes',                 $W, $false, $false, '',                 'console'),
+    @('W in the console: up -> passes',                   $W, $true,  $false, '',                 'console'),
+    @('console key up',                                   $C, $true,  $false, '',                 'console'),
+    @('console key -> console closed, map',               $C, $false, $false, '',                 'map'),
+    @('console key up',                                   $C, $true,  $false, '',                 'map'),
+    @('S down on the map -> Down at once',                $S, $false, $true,  '28vx',             'map'),
+    @('S up',                                             $S, $true,  $true,  '28^x',             'map')
 )
 $wbad = 0
-foreach ($s in $steps) {
-    $r = Key $s[0] $s[1][0] $s[1][1] $s[2]
-    $typingNow = (WF 'typing').GetValue($null)
-    if ($r.swallowed -ne $s[3] -or $r.sent -ne $s[4] -or $typingNow -ne $s[5]) { $wbad++; "   FAIL $($s[0]): swallowed $($r.swallowed) sent '$($r.sent)' typing $typingNow" }
+foreach ($step in $steps) {   # (not $s: PowerShell names ignore case, so $s would overwrite the S key)
+    $r = if ($step[1] -is [int]) { Tick $step[1] } else { Key $step[1] $step[2] }
+    $st = State
+    if ($r.swallowed -ne $step[3] -or $r.sent -ne $step[4] -or $st -ne $step[5]) { $wbad++; "   FAIL $($step[0]): swallowed $($r.swallowed) sent '$($r.sent)' state $st" }
 }
-# not in front / injected keys are never touched
+# switching away while a key waits types nothing; not in front / injected keys are never touched
+$r = Key $E $false; $r = Key $E $true; $r = Key $W $false
+$front.Invoke($null, $null) | Out-Null   # the real foreground window is not HOI4 here
+$r = Key $W $true; if (-not $r.swallowed -or $r.sent) { $wbad++; "   FAIL W after switching away: swallowed $($r.swallowed) sent '$($r.sent)'" }
 (WF 'hoiFront').SetValue($null, $false)
-$r = Key 'W, game not in front' $W[0] $W[1] $false; if ($r.swallowed -or $r.sent) { $wbad++; '   FAIL W changed while HOI4 not in front' }
-$r = Key 'W up' $W[0] $W[1] $true
-$r = Key 'console key, game not in front' $C[0] $C[1] $false; if ((WF 'typing').GetValue($null)) { $wbad++; '   FAIL console key counted while HOI4 not in front' }
-$r = Key 'console up' $C[0] $C[1] $true
+$r = Key $W $false; if ($r.swallowed -or $r.sent) { $wbad++; '   FAIL W changed while HOI4 not in front' }
+$r = Key $W $true
+$r = Key $C $false; if ((WF 'typing').GetValue($null)) { $wbad++; '   FAIL console key counted while HOI4 not in front' }
+$r = Key $C $true
 (WF 'hoiFront').SetValue($null, $true)
-$r = Key 'injected W' $W[0] $W[1] $false $true; if ($r.swallowed -or $r.sent) { $wbad++; '   FAIL injected W was changed' }
+$r = Key $W $false $true; if ($r.swallowed -or $r.sent) { $wbad++; '   FAIL injected W was changed' }
 [Runtime.InteropServices.Marshal]::FreeHGlobal($mem)
 $fail += $wbad
-"4. WASD keys: $($steps.Count + 4) steps (map, console open/close, key repeat, held key, Esc, not in front, injected), wrong: $wbad"
+"4. WASD keys: $($steps.Count + 6) steps (standby taps/holds, typing order, Esc / save screen, console, held keys, switching away, injected), wrong: $wbad"
 
 # ---------- 5. WASD default and remembered choice ----------
 $f2 = [Activator]::CreateInstance($t, $true); $null = $f2.Handle
