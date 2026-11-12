@@ -32,10 +32,10 @@ really switches unticked DLC off, so "No DLC" works there too.
 
 WASD map movement (tick it under the PLAY button - it is off unless you
 turn it on): hold W/A/S/D to scroll the map. Until you first hold one, and
-again after every Esc (the menu and the save screen), a quick tap types the
-letter instead - so names in the menus and save names work. The console
-(the key under Esc) pauses it while it is open. F11 turns it off and on
-(for chat).
+again after every Esc or mouse click, a quick tap types the letter instead -
+so save names, game-rule presets, names in the menus and chat all work. The
+console (the key under Esc) pauses it while it is open. F11 turns it off and
+on.
 
 Custom game "ACW: MacArthur" (the MacArthur tile): click it so it says ON,
 pick your Kaiserreich, then PLAY. In the game either

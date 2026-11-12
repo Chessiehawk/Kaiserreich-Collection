@@ -208,11 +208,23 @@ $steps = @(
     @('console key -> console closed, map',               $C, $false, $false, '',                 'map'),
     @('console key up',                                   $C, $true,  $false, '',                 'map'),
     @('S down on the map -> Down at once',                $S, $false, $true,  '28vx',             'map'),
-    @('S up',                                             $S, $true,  $true,  '28^x',             'map')
+    @('S up',                                             $S, $true,  $true,  '28^x',             'map'),
+    @('left click (Game Rules / a text box) -> standby',  'click', $null, $true, '',              'standby'),
+    @('A tap in the preset name: down',                   $A, $false, $true,  '',                 'standby'),
+    @('A tap up -> letter a',                             $A, $true,  $true,  '41v 41^',          'standby'),
+    @('D down (back on the map)',                         $D, $false, $true,  '',                 'standby'),
+    @('D held 0.3 s -> panning',                          300, $null, $true,  '27vx',             'map'),
+    @('click while D held -> standby, D keeps panning',   'click', $null, $true, '',              'standby'),
+    @('D repeat -> Right again',                          $D, $false, $true,  '27vx',             'standby'),
+    @('D up -> Right released',                           $D, $true,  $true,  '27^x',             'standby'),
+    @('W down after the click -> waits',                  $W, $false, $true,  '',                 'standby'),
+    @('W up quickly -> letter w',                         $W, $true,  $true,  '57v 57^',          'standby')
 )
+$click = $wasdType.GetMethod('OnClick', $bf)
+function Click { $script:sent.Clear(); $click.Invoke($null, $null) | Out-Null; @{ swallowed = $true; sent = ($script:sent -join ' ') } }
 $wbad = 0
 foreach ($step in $steps) {   # (not $s: PowerShell names ignore case, so $s would overwrite the S key)
-    $r = if ($step[1] -is [int]) { Tick $step[1] } else { Key $step[1] $step[2] }
+    $r = if ($step[1] -is [int]) { Tick $step[1] } elseif ($step[1] -is [string]) { Click } else { Key $step[1] $step[2] }
     $st = State
     if ($r.swallowed -ne $step[3] -or $r.sent -ne $step[4] -or $st -ne $step[5]) { $wbad++; "   FAIL $($step[0]): swallowed $($r.swallowed) sent '$($r.sent)' state $st" }
 }
@@ -225,11 +237,12 @@ $r = Key $W $false; if ($r.swallowed -or $r.sent) { $wbad++; '   FAIL W changed 
 $r = Key $W $true
 $r = Key $C $false; if ((WF 'typing').GetValue($null)) { $wbad++; '   FAIL console key counted while HOI4 not in front' }
 $r = Key $C $true
+(WF 'standby').SetValue($null, $false); $r = Click; if ((WF 'standby').GetValue($null)) { $wbad++; '   FAIL a click in another program put WASD on standby' }
 (WF 'hoiFront').SetValue($null, $true)
 $r = Key $W $false $true; if ($r.swallowed -or $r.sent) { $wbad++; '   FAIL injected W was changed' }
 [Runtime.InteropServices.Marshal]::FreeHGlobal($mem)
 $fail += $wbad
-"4. WASD keys: $($steps.Count + 6) steps (standby taps/holds, typing order, Esc / save screen, console, held keys, switching away, injected), wrong: $wbad"
+"4. WASD keys: $($steps.Count + 7) steps (standby taps/holds, typing order, Esc / save screen, clicks / game rules, console, held keys, switching away, injected), wrong: $wbad"
 
 # ---------- 5. WASD default and remembered choice ----------
 $f2 = [Activator]::CreateInstance($t, $true); $null = $f2.Handle

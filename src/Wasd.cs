@@ -2,11 +2,11 @@
 // Runs as "<launcher>.exe /wasd", started by the engine right after the game starts; ends on its own once no
 // hoi4.exe has been running for a short while. Only while a hoi4.exe window is in front:
 //   W/A/S/D (no Shift/Ctrl/Alt)  ->  Up/Left/Down/Right arrow keys
-//   standby                      ->  from the start (main menu, lobby, picking a country) and after every Esc (the save
-//                                    screen is behind Esc): a quick tap types the letter, holding the key for a moment
-//                                    starts panning and ends standby
+//   standby                      ->  from the start and after every Esc or left click (a click may be into a text box:
+//                                    game-rule presets, save names, chat; the save screen is behind Esc): a quick tap
+//                                    types the letter, holding the key for a moment starts panning and ends standby
 //   console key (under Esc)      ->  the game's console opens: W/A/S/D type letters until it is pressed again
-//   F11                          ->  turns WASD off/on (e.g. for chat)
+//   F11                          ->  turns WASD off/on
 // Everything else, and every other program, is left alone.
 //
 // Windows silently removes a low-level keyboard hook that answers too slowly (easy while HOI4 loads and eats the
@@ -41,7 +41,7 @@ static class Wasd
     [StructLayout(LayoutKind.Explicit)] struct InputUnion { [FieldOffset(0)] public MOUSEINPUT mi; [FieldOffset(0)] public KEYBDINPUT ki; }
     [StructLayout(LayoutKind.Sequential)] struct INPUT { public uint type; public InputUnion u; }
 
-    const int WH_KEYBOARD_LL = 13, VK_F11 = 0x7A, VK_ESCAPE = 0x1B;
+    const int WH_KEYBOARD_LL = 13, VK_F11 = 0x7A, VK_ESCAPE = 0x1B, VK_LBUTTON = 0x01;
     const uint SCAN_CONSOLE = 0x29;          // the key under Esc (` ~ on US keyboards, ^ on German ones), by position not letter
     const uint LLKHF_EXTENDED = 0x01, LLKHF_INJECTED = 0x10, LLKHF_UP = 0x80, KEYEVENTF_EXTENDEDKEY = 0x1, KEYEVENTF_KEYUP = 0x2;
     const int HOLD_MS = 250;                 // in standby a key held this long means "pan"; typing taps are shorter
@@ -81,9 +81,10 @@ static class Wasd
         var front = new System.Windows.Forms.Timer { Interval = 150 };
         front.Tick += (s, e) => UpdateFront();
         front.Start();
-        // standby: a key that is still down after HOLD_MS starts panning (without waiting for Windows' key repeat)
+        // standby: a left click (down now, or pressed since the last look) may have been into a text box; a key that is
+        // still down after HOLD_MS starts panning (without waiting for Windows' key repeat). Polled, no mouse hook.
         var hold = new System.Windows.Forms.Timer { Interval = 50 };
-        hold.Tick += (s, e) => CheckPending();
+        hold.Tick += (s, e) => { if ((GetAsyncKeyState(VK_LBUTTON) & 0x8001) != 0) OnClick(); CheckPending(); };
         hold.Start();
         // re-install the hook now and then: Windows may have dropped it without telling us
         var rehook = new System.Windows.Forms.Timer { Interval = 30000 };
@@ -166,6 +167,7 @@ static class Wasd
         foreach (var p in pending) { if (Arrow(p.Vk, out avk, out scan)) { held.Add(p.Vk); send(avk, scan, false, true); } }
         pending.Clear(); standby = false;
     }
+    static void OnClick() { if (hoiFront) standby = true; }   // a key already held keeps panning until it is let go
     static int PendingIndex(uint vk) { for (int i = 0; i < pending.Count; i++) if (pending[i].Vk == vk) return i; return -1; }
     static void CheckPending() { if (pending.Count > 0 && now() - pending[0].Since >= HOLD_MS) StartPan(); }
 
