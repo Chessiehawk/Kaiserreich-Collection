@@ -132,7 +132,8 @@ class CollectionForm : Form
             else { HashSet<string> prev; dlcBeforeNone.TryGetValue(sel.Branch, out prev); dlcChoice[sel.Branch] = (prev == null || prev.Count == 0) ? null : prev; dlcBeforeNone.Remove(sel.Branch); }
             UpdateDlcLabel();
         };
-        cbWasd = new CheckBox { Text = "WASD map movement (F11 = off/on)", Checked = true, ForeColor = Color.White, BackColor = Color.Transparent, AutoSize = true, Left = x0 + 640, Top = yDlc + 6, Font = new Font("Segoe UI", 10) };
+        // WASD is opt-in: while it is on, W/A/S/D can't be typed in chat or save names (the console pauses it by itself)
+        cbWasd = new CheckBox { Text = "WASD map movement (F11 = off/on)", Checked = false, ForeColor = Color.White, BackColor = Color.Transparent, AutoSize = true, Left = x0 + 640, Top = yDlc + 6, Font = new Font("Segoe UI", 10) };
         Controls.AddRange(new Control[] { dlcBtn, cbNoDlc, dlcLabel, cbWasd });
 
         int yBtn = yDlc + 44;
@@ -378,7 +379,7 @@ class CollectionForm : Form
                 if (k == "sel") { var v = versions.Find(x => x.Branch == val); if (v != null) Select(v); }
                 else if (k == "plpc") { tPlpc.On = val == "1"; tPlpc.Invalidate(); }
                 else if (k == "scn") { var ids = new List<string>(val.Split(',')); foreach (var sc in scns) { sc.Tile.On = ids.Contains(sc.Id); sc.Tile.Invalidate(); } UpdateBackground(); }
-                else if (k == "wasd") { cbWasd.Checked = val != "0"; }
+                else if (k == "wasdOn") { cbWasd.Checked = val == "1"; }   // the old "wasd" key held the old default (on), so it is ignored
                 else if (k.StartsWith("dlc:")) { string b = k.Substring(4); if (val == "*") dlcChoice.Remove(b); else if (val == "-") dlcChoice[b] = new HashSet<string>(); else dlcChoice[b] = new HashSet<string>(val.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)); }
             }
             UpdateDlcLabel(); status.Text = "Ready. Pick a Kaiserreich and click PLAY.";
@@ -386,7 +387,7 @@ class CollectionForm : Form
     }
     void SaveLastChoice()
     {
-        var lines = new List<string> { "sel=" + (sel == null ? "" : sel.Branch), "plpc=" + (tPlpc.On ? "1" : "0"), "scn=" + string.Join(",", scns.FindAll(x => x.Tile.On).ConvertAll(x => x.Id).ToArray()), "wasd=" + (cbWasd.Checked ? "1" : "0") };
+        var lines = new List<string> { "sel=" + (sel == null ? "" : sel.Branch), "plpc=" + (tPlpc.On ? "1" : "0"), "scn=" + string.Join(",", scns.FindAll(x => x.Tile.On).ConvertAll(x => x.Id).ToArray()), "wasdOn=" + (cbWasd.Checked ? "1" : "0") };
         foreach (var kv in dlcChoice) lines.Add("dlc:" + kv.Key + "=" + (kv.Value == null ? "*" : kv.Value.Count == 0 ? "-" : string.Join(";", new List<string>(kv.Value).ToArray())));
         try { File.WriteAllLines(Path.Combine(HomeDir(), "last.txt"), lines.ToArray()); } catch { }
     }
@@ -475,7 +476,8 @@ class CollectionForm : Form
             places.Add(top);
             try { places.AddRange(Directory.GetDirectories(top)); } catch { }
         }
-        var zipName = new Regex(@"^Kaiserreich-Collection-(\d+(?:\.\d+){1,3})(?: \(\d+\))?\.zip$", RegexOptions.IgnoreCase);
+        // "Kaiserreich-Collection-1.4.1.zip" (GitHub) and "Kaiserreich Collection 1.4.1 - launcher.zip" (Discord), plus browser " (1)" copies
+        var zipName = new Regex(@"^Kaiserreich[- ]Collection[- ](\d+(?:\.\d+){1,3})(?: - launcher)?(?: \(\d+\))?\.zip$", RegexOptions.IgnoreCase);
         foreach (var place in places) {
             string[] files; try { files = Directory.GetFiles(place); } catch { continue; }
             foreach (var f in files) {

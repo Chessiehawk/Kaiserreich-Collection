@@ -2,7 +2,8 @@
 // Runs as "<launcher>.exe /wasd", started by the engine right after the game starts; ends on its own once no
 // hoi4.exe has been running for a short while. Only while a hoi4.exe window is in front:
 //   W/A/S/D (no Shift/Ctrl/Alt)  ->  Up/Left/Down/Right arrow keys
-//   F11                          ->  turns WASD off/on (to type names, use the console, or use the W/A/S/D hotkeys)
+//   console key (under Esc)      ->  the game's console opens: W/A/S/D type letters until it is pressed again or Esc
+//   F11                          ->  turns WASD off/on (to type names or chat, or use the W/A/S/D hotkeys)
 // Everything else, and every other program, is left alone.
 //
 // Windows silently removes a low-level keyboard hook that answers too slowly (easy while HOI4 loads and eats the
@@ -37,12 +38,15 @@ static class Wasd
     [StructLayout(LayoutKind.Explicit)] struct InputUnion { [FieldOffset(0)] public MOUSEINPUT mi; [FieldOffset(0)] public KEYBDINPUT ki; }
     [StructLayout(LayoutKind.Sequential)] struct INPUT { public uint type; public InputUnion u; }
 
-    const int WH_KEYBOARD_LL = 13, VK_F11 = 0x7A;
+    const int WH_KEYBOARD_LL = 13, VK_F11 = 0x7A, VK_ESCAPE = 0x1B;
+    const uint SCAN_CONSOLE = 0x29;          // the key under Esc (` ~ on US keyboards, ^ on German ones), by position not letter
     const uint LLKHF_INJECTED = 0x10, LLKHF_UP = 0x80, KEYEVENTF_EXTENDEDKEY = 0x1, KEYEVENTF_KEYUP = 0x2;
 
     static IntPtr hook = IntPtr.Zero, hMod = IntPtr.Zero;
     static HookProc proc;                    // kept in a field so the garbage collector can't free it
     static bool enabled = true;
+    static bool typing, consoleKeyDown;      // console open: W/A/S/D are letters (key repeat doesn't flip it back)
+    static Action<ushort, ushort, bool> send = SendKey;   // swappable so the stress test can watch without pressing real keys
     static volatile bool hoiFront;           // set by a timer - never worked out inside the hook
     static readonly HashSet<uint> held = new HashSet<uint>();   // W/A/S/D keys whose arrow is currently pressed
     static readonly INPUT[] one = new INPUT[1];
@@ -118,11 +122,17 @@ static class Wasd
         }
         return false;
     }
-    static void Send(ushort vk, ushort scan, bool up)
+    static void SendKey(ushort vk, ushort scan, bool up)
     {
         one[0].type = 1;
         one[0].u.ki = new KEYBDINPUT { wVk = vk, wScan = scan, dwFlags = KEYEVENTF_EXTENDEDKEY | (up ? KEYEVENTF_KEYUP : 0) };
         SendInput(1, one, inputSize);
+    }
+    static void ReleaseHeld()
+    {
+        ushort avk, scan;
+        foreach (uint vk in new List<uint>(held)) { if (Arrow(vk, out avk, out scan)) send(avk, scan, true); }
+        held.Clear();
     }
 
     static IntPtr Callback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -131,19 +141,25 @@ static class Wasd
             var k = (KBDLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(KBDLLHOOKSTRUCT));
             bool injected = (k.flags & LLKHF_INJECTED) != 0, up = (k.flags & LLKHF_UP) != 0;
             ushort avk, scan;
+            // the console key opens and closes the game's console; Esc closes it (and menus) - always "back to the map".
+            // Both keys still go on to the game.
+            if (!injected && k.scanCode == SCAN_CONSOLE) {
+                if (up) consoleKeyDown = false;
+                else if (!consoleKeyDown && hoiFront) { consoleKeyDown = true; typing = !typing; if (typing) ReleaseHeld(); }
+            }
+            if (!injected && !up && k.vkCode == VK_ESCAPE && hoiFront) typing = false;
             if (!injected && Arrow(k.vkCode, out avk, out scan)) {
                 // a key we turned into an arrow is always released as that arrow, so nothing gets stuck
-                if (up && held.Remove(k.vkCode)) { Send(avk, scan, true); return (IntPtr)1; }
-                if (!up && held.Contains(k.vkCode)) { Send(avk, scan, false); return (IntPtr)1; }   // key repeat
-                if (!up && enabled && hoiFront && !Down(0x10) && !Down(0x11) && !Down(0x12)) {
-                    held.Add(k.vkCode); Send(avk, scan, false); return (IntPtr)1;
+                if (up && held.Remove(k.vkCode)) { send(avk, scan, true); return (IntPtr)1; }
+                if (!up && held.Contains(k.vkCode)) { send(avk, scan, false); return (IntPtr)1; }   // key repeat
+                if (!up && enabled && !typing && hoiFront && !Down(0x10) && !Down(0x11) && !Down(0x12)) {
+                    held.Add(k.vkCode); send(avk, scan, false); return (IntPtr)1;
                 }
             }
             if (!injected && k.vkCode == VK_F11 && hoiFront) {
                 if (!up) {
                     enabled = !enabled;
-                    foreach (uint vk in new List<uint>(held)) { if (Arrow(vk, out avk, out scan)) Send(avk, scan, true); }
-                    held.Clear();
+                    ReleaseHeld();
                     bool nowOn = enabled;
                     ThreadPool.QueueUserWorkItem(_ => { if (nowOn) SystemSounds.Asterisk.Play(); else SystemSounds.Hand.Play(); });
                 }
