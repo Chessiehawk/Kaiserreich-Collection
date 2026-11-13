@@ -31,11 +31,11 @@ the moment someone joins. On the oldest versions (HOI4 1.5-1.7) the launcher
 really switches unticked DLC off, so "No DLC" works there too.
 
 WASD map movement (tick it under the PLAY button - it is off unless you
-turn it on): hold W/A/S/D to scroll the map. Until you first hold one, and
-again after every Esc or mouse click, a quick tap types the letter instead -
-so save names, game-rule presets, names in the menus and chat all work. The
-console (the key under Esc) pauses it while it is open. F11 turns it off and
-on.
+turn it on): W/A/S/D scroll the map once a game has started - in the menus
+(game rules, lobby, names) the keys type normally. After Esc (the in-game
+menu and the save screen) a quick tap types the letter, so save names work;
+holding a key scrolls again. The console (the key under Esc) pauses it while
+it is open. F11 turns it off and on (e.g. for chat or naming divisions).
 
 Custom game "ACW: MacArthur" (the MacArthur tile): click it so it says ON,
 pick your Kaiserreich, then PLAY. In the game either

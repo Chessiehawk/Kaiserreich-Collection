@@ -1,13 +1,16 @@
 // WASD map movement for Hearts of Iron IV (the game itself only pans with the arrow keys).
 // Runs as "<launcher>.exe /wasd", started by the engine right after the game starts; ends on its own once no
 // hoi4.exe has been running for a short while. Only while a hoi4.exe window is in front:
-//   W/A/S/D (no Shift/Ctrl/Alt)  ->  Up/Left/Down/Right arrow keys
-//   standby                      ->  from the start and after every Esc or left click (a click may be into a text box:
-//                                    game-rule presets, save names, chat; the save screen is behind Esc): a quick tap
+//   menus (before a game starts) ->  WASD is off: game rules, lobby and names type normally. The game writes
+//                                    "[[ Launching SINGLEPLAYER-game ]]" (or MULTIPLAYER) to its logs when a game starts
+//                                    (every version from 1.5 on) and "Resetting game" back in the menus.
+//   W/A/S/D (no Shift/Ctrl/Alt)  ->  in a game: Up/Left/Down/Right arrow keys
+//   standby                      ->  after every Esc (the in-game menu and the save screen are behind it): a quick tap
 //                                    types the letter, holding the key for a moment starts panning and ends standby
 //   console key (under Esc)      ->  the game's console opens: W/A/S/D type letters until it is pressed again
-//   F11                          ->  turns WASD off/on
-// Everything else, and every other program, is left alone.
+//   F11                          ->  turns WASD off/on (e.g. for chat or naming divisions)
+// Everything else, and every other program, is left alone. If the game's log folder can't be found, WASD starts in
+// standby instead (it can't tell the menus from a game then).
 //
 // Windows silently removes a low-level keyboard hook that answers too slowly (easy while HOI4 loads and eats the
 // CPU), so the hook itself only does cheap work: whether HOI4 is in front is worked out by a timer, the code is
@@ -16,6 +19,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Media;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -41,7 +45,7 @@ static class Wasd
     [StructLayout(LayoutKind.Explicit)] struct InputUnion { [FieldOffset(0)] public MOUSEINPUT mi; [FieldOffset(0)] public KEYBDINPUT ki; }
     [StructLayout(LayoutKind.Sequential)] struct INPUT { public uint type; public InputUnion u; }
 
-    const int WH_KEYBOARD_LL = 13, VK_F11 = 0x7A, VK_ESCAPE = 0x1B, VK_LBUTTON = 0x01;
+    const int WH_KEYBOARD_LL = 13, VK_F11 = 0x7A, VK_ESCAPE = 0x1B;
     const uint SCAN_CONSOLE = 0x29;          // the key under Esc (` ~ on US keyboards, ^ on German ones), by position not letter
     const uint LLKHF_EXTENDED = 0x01, LLKHF_INJECTED = 0x10, LLKHF_UP = 0x80, KEYEVENTF_EXTENDEDKEY = 0x1, KEYEVENTF_KEYUP = 0x2;
     const int HOLD_MS = 250;                 // in standby a key held this long means "pan"; typing taps are shorter
@@ -51,7 +55,11 @@ static class Wasd
     static IntPtr hook = IntPtr.Zero, hMod = IntPtr.Zero;
     static HookProc proc;                    // kept in a field so the garbage collector can't free it
     static bool enabled = true;
-    static bool standby = true;              // main menu / lobby / after Esc: taps are letters, a hold starts panning
+    static bool ingame;                      // a game is running (from the logs) - in the menus WASD is off
+    static bool standby = true;              // after Esc: taps are letters, a hold starts panning
+    static string[] logFiles;                // null = the game's logs can't be read: no menu/game detection
+    static long[] logPos; static string[] logCarry;
+    const string LAUNCHED = "-game ]]", RESET = "Resetting game";
     static bool typing, consoleKeyDown;      // console open: W/A/S/D are letters (key repeat doesn't flip it back)
     static volatile bool hoiFront;           // set by a timer - never worked out inside the hook
     static readonly HashSet<uint> held = new HashSet<uint>();        // W/A/S/D keys whose arrow is currently pressed
@@ -76,15 +84,19 @@ static class Wasd
         Install();
         if (hook == IntPtr.Zero) return;
         UpdateFront();
+        InitLogs(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Paradox Interactive", "Hearts of Iron IV", "logs"));
 
         // is HOI4 the window in front? (checked here, not in the hook)
         var front = new System.Windows.Forms.Timer { Interval = 150 };
         front.Tick += (s, e) => UpdateFront();
         front.Start();
-        // standby: a left click (down now, or pressed since the last look) may have been into a text box; a key that is
-        // still down after HOLD_MS starts panning (without waiting for Windows' key repeat). Polled, no mouse hook.
+        // menus or a game? (the game's logs, read only where they grew)
+        var logs = new System.Windows.Forms.Timer { Interval = 500 };
+        logs.Tick += (s, e) => ReadLogs();
+        logs.Start();
+        // standby: a key that is still down after HOLD_MS starts panning (without waiting for Windows' key repeat)
         var hold = new System.Windows.Forms.Timer { Interval = 50 };
-        hold.Tick += (s, e) => { if ((GetAsyncKeyState(VK_LBUTTON) & 0x8001) != 0) OnClick(); CheckPending(); };
+        hold.Tick += (s, e) => CheckPending();
         hold.Start();
         // re-install the hook now and then: Windows may have dropped it without telling us
         var rehook = new System.Windows.Forms.Timer { Interval = 30000 };
@@ -96,7 +108,7 @@ static class Wasd
         life.Tick += (s, e) => {
             if (Process.GetProcessesByName("hoi4").Length > 0) lastSeen = DateTime.Now;
             bool gone = lastSeen == DateTime.MinValue ? (DateTime.Now - start).TotalMinutes > 4 : (DateTime.Now - lastSeen).TotalSeconds > 20;
-            if (gone) { life.Stop(); front.Stop(); hold.Stop(); rehook.Stop(); Application.ExitThread(); }
+            if (gone) { life.Stop(); front.Stop(); logs.Stop(); hold.Stop(); rehook.Stop(); Application.ExitThread(); }
         };
         life.Start();
         Application.Run();
@@ -167,7 +179,46 @@ static class Wasd
         foreach (var p in pending) { if (Arrow(p.Vk, out avk, out scan)) { held.Add(p.Vk); send(avk, scan, false, true); } }
         pending.Clear(); standby = false;
     }
-    static void OnClick() { if (hoiFront) standby = true; }   // a key already held keeps panning until it is let go
+    // The game's logs say when a game starts and when it is back in the menus. What is already in them when the helper
+    // starts belongs to the last session (the game starts new logs a moment later), so only what is added counts.
+    static void InitLogs(string dir)
+    {
+        if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) { logFiles = null; ingame = true; standby = true; return; }
+        logFiles = new[] { Path.Combine(dir, "game.log"), Path.Combine(dir, "system.log"), Path.Combine(dir, "setup.log") };
+        logPos = new long[logFiles.Length]; logCarry = new string[logFiles.Length];
+        for (int i = 0; i < logFiles.Length; i++) { logCarry[i] = ""; try { logPos[i] = File.Exists(logFiles[i]) ? new FileInfo(logFiles[i]).Length : 0; } catch { } }
+        ingame = false; standby = false;
+    }
+    static void ReadLogs()
+    {
+        if (logFiles == null) return;
+        for (int i = 0; i < logFiles.Length; i++) {
+            try {
+                if (!File.Exists(logFiles[i])) { logPos[i] = 0; logCarry[i] = ""; continue; }
+                long len = new FileInfo(logFiles[i]).Length;
+                if (len < logPos[i]) { logPos[i] = 0; logCarry[i] = ""; }   // the game started a new log
+                if (len == logPos[i]) continue;
+                byte[] buf = new byte[(int)Math.Min(len - logPos[i], 1 << 20)]; int got;
+                using (var fs = new FileStream(logFiles[i], FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)) { fs.Seek(logPos[i], SeekOrigin.Begin); got = fs.Read(buf, 0, buf.Length); }
+                logPos[i] += got;
+                // the tail of the last read is kept so a line split between two reads is still found; a marker that
+                // lies wholly in that tail was seen last time and doesn't count again
+                string carry = logCarry[i], text = carry + System.Text.Encoding.ASCII.GetString(buf, 0, got);
+                int launched = text.LastIndexOf(LAUNCHED, StringComparison.Ordinal), reset = text.LastIndexOf(RESET, StringComparison.Ordinal);
+                if (launched + LAUNCHED.Length <= carry.Length) launched = -1;
+                if (reset + RESET.Length <= carry.Length) reset = -1;
+                if (launched > reset) EnterGame(); else if (reset > launched) LeaveGame();
+                logCarry[i] = text.Length > 16 ? text.Substring(text.Length - 16) : text;
+            } catch { }   // being written or locked: next time
+        }
+    }
+    static void EnterGame() { if (ingame) return; ingame = true; standby = false; }
+    static void LeaveGame()
+    {
+        if (!ingame) return;
+        ingame = false; ReleaseHeld();
+        foreach (var p in pending) swallowUp.Add(p.Vk); pending.Clear();
+    }
     static int PendingIndex(uint vk) { for (int i = 0; i < pending.Count; i++) if (pending[i].Vk == vk) return i; return -1; }
     static void CheckPending() { if (pending.Count > 0 && now() - pending[0].Since >= HOLD_MS) StartPan(); }
 
@@ -179,7 +230,7 @@ static class Wasd
             ushort avk, scan;
             if (!injected) {
                 bool wasd = Arrow(k.vkCode, out avk, out scan);
-                bool plain = enabled && !typing && hoiFront && !Down(0x10) && !Down(0x11) && !Down(0x12);
+                bool plain = enabled && ingame && !typing && hoiFront && !Down(0x10) && !Down(0x11) && !Down(0x12);
                 // another key while standby keys wait: they were typing - type them first, then this key, in that order
                 bool replay = !up && pending.Count > 0 && !(wasd && plain && standby);
                 if (replay) TypePending(0);

@@ -165,7 +165,7 @@ function Key([int[]]$key, [bool]$up, [bool]$injected = $false) {
 function Tick([int]$ms) { $script:clock += $ms; $script:sent.Clear(); $check.Invoke($null, $null) | Out-Null; @{ swallowed = $true; sent = ($script:sent -join ' ') } }
 $W = @(0x57, 0x11); $A = @(0x41, 0x1E); $S = @(0x53, 0x1F); $D = @(0x44, 0x20); $O = @(0x4F, 0x18); $C = @(0xC0, 0x29); $E = @(0x1B, 0x01)
 (WF 'hoiFront').SetValue($null, $true); (WF 'enabled').SetValue($null, $true); (WF 'typing').SetValue($null, $false)
-if ((State) -ne 'standby') { $fail++; '   FAIL the helper does not start in standby' }
+(WF 'ingame').SetValue($null, $true); (WF 'standby').SetValue($null, $true)   # in a game, right after Esc (section 4b covers the menus)
 # name, key (or tick ms), up, swallowed, sent, state after
 $steps = @(
     @('start (menu): W tap down -> waits',               $W, $false, $true,  '',                 'standby'),
@@ -208,23 +208,11 @@ $steps = @(
     @('console key -> console closed, map',               $C, $false, $false, '',                 'map'),
     @('console key up',                                   $C, $true,  $false, '',                 'map'),
     @('S down on the map -> Down at once',                $S, $false, $true,  '28vx',             'map'),
-    @('S up',                                             $S, $true,  $true,  '28^x',             'map'),
-    @('left click (Game Rules / a text box) -> standby',  'click', $null, $true, '',              'standby'),
-    @('A tap in the preset name: down',                   $A, $false, $true,  '',                 'standby'),
-    @('A tap up -> letter a',                             $A, $true,  $true,  '41v 41^',          'standby'),
-    @('D down (back on the map)',                         $D, $false, $true,  '',                 'standby'),
-    @('D held 0.3 s -> panning',                          300, $null, $true,  '27vx',             'map'),
-    @('click while D held -> standby, D keeps panning',   'click', $null, $true, '',              'standby'),
-    @('D repeat -> Right again',                          $D, $false, $true,  '27vx',             'standby'),
-    @('D up -> Right released',                           $D, $true,  $true,  '27^x',             'standby'),
-    @('W down after the click -> waits',                  $W, $false, $true,  '',                 'standby'),
-    @('W up quickly -> letter w',                         $W, $true,  $true,  '57v 57^',          'standby')
+    @('S up',                                             $S, $true,  $true,  '28^x',             'map')
 )
-$click = $wasdType.GetMethod('OnClick', $bf)
-function Click { $script:sent.Clear(); $click.Invoke($null, $null) | Out-Null; @{ swallowed = $true; sent = ($script:sent -join ' ') } }
 $wbad = 0
 foreach ($step in $steps) {   # (not $s: PowerShell names ignore case, so $s would overwrite the S key)
-    $r = if ($step[1] -is [int]) { Tick $step[1] } elseif ($step[1] -is [string]) { Click } else { Key $step[1] $step[2] }
+    $r = if ($step[1] -is [int]) { Tick $step[1] } else { Key $step[1] $step[2] }
     $st = State
     if ($r.swallowed -ne $step[3] -or $r.sent -ne $step[4] -or $st -ne $step[5]) { $wbad++; "   FAIL $($step[0]): swallowed $($r.swallowed) sent '$($r.sent)' state $st" }
 }
@@ -237,12 +225,59 @@ $r = Key $W $false; if ($r.swallowed -or $r.sent) { $wbad++; '   FAIL W changed 
 $r = Key $W $true
 $r = Key $C $false; if ((WF 'typing').GetValue($null)) { $wbad++; '   FAIL console key counted while HOI4 not in front' }
 $r = Key $C $true
-(WF 'standby').SetValue($null, $false); $r = Click; if ((WF 'standby').GetValue($null)) { $wbad++; '   FAIL a click in another program put WASD on standby' }
 (WF 'hoiFront').SetValue($null, $true)
 $r = Key $W $false $true; if ($r.swallowed -or $r.sent) { $wbad++; '   FAIL injected W was changed' }
-[Runtime.InteropServices.Marshal]::FreeHGlobal($mem)
+if ($wasdType.GetMethod('OnClick', $bf)) { $wbad++; '   FAIL clicks still put WASD on standby (1.4.4 behaviour)' }
 $fail += $wbad
-"4. WASD keys: $($steps.Count + 7) steps (standby taps/holds, typing order, Esc / save screen, clicks / game rules, console, held keys, switching away, injected), wrong: $wbad"
+"4. WASD keys in a game: $($steps.Count + 7) steps (standby taps/holds, typing order, Esc / save screen, console, held keys, switching away, injected, clicks ignored), wrong: $wbad"
+
+# ---------- 4b. menus or a game? (read from the game's logs) ----------
+$logs = Join-Path $Work 'hoi4logs'; New-Item -ItemType Directory -Force $logs | Out-Null
+$gl = Join-Path $logs 'game.log'; $sl = Join-Path $logs 'setup.log'
+[IO.File]::WriteAllText($gl, "[old][frontend.cpp:635]: `r`n`r`n`t`t[[ Launching SINGLEPLAYER-game ]]`r`n`tStart-date: 1936.1.1.1`r`n[old] lots more of the last session`r`n")
+$initLogs = $wasdType.GetMethod('InitLogs', $bf); $readLogs = $wasdType.GetMethod('ReadLogs', $bf)
+function InGame { (WF 'ingame').GetValue($null) }
+function AddLog([string]$file, [string]$text) { [IO.File]::AppendAllText($file, $text); $readLogs.Invoke($null, $null) | Out-Null }
+$lbad = 0; $checks = 0
+function Check([bool]$ok, [string]$what) { $script:checks++; if (-not $ok) { $script:lbad++; "   FAIL $what" } }
+(WF 'hoiFront').SetValue($null, $true); (WF 'typing').SetValue($null, $false); (WF 'enabled').SetValue($null, $true)
+$initLogs.Invoke($null, [object[]]@([string]$logs)) | Out-Null; $readLogs.Invoke($null, $null) | Out-Null
+Check (-not (InGame)) 'the last session''s "Launching" line counted'
+[IO.File]::WriteAllText($gl, "[11:19:03][defines.cpp:182]: 3042 defines loaded`r`n"); $readLogs.Invoke($null, $null) | Out-Null   # the game starts a new log
+Check (-not (InGame)) 'in a game right after the game started'
+$r = Key $W $false; $r2 = Key $W $true; Check (-not $r.swallowed -and -not $r2.swallowed -and -not $r.sent) 'W in the main menu was changed'
+AddLog $gl "[11:20:15][gameapplication.cpp:2354]: Resetting game`r`n"
+Check (-not (InGame)) '"Resetting game" in the menus switched WASD on'
+$r = Key $D $false; $r2 = Key $D $false; $r3 = Key $D $true; Check (-not ($r.swallowed -or $r2.swallowed -or $r3.swallowed)) 'D held on the country-select map was changed'
+$r = Key $A $false; $r2 = Key $A $true; $r3 = Key $S $false; $r4 = Key $S $true
+Check (-not ($r.swallowed -or $r2.swallowed -or $r3.swallowed -or $r4.swallowed)) 'a game-rules preset name ("as") was changed'
+$r = Key $E $false; $r2 = Key $E $true; $r3 = Key $W $false; $r4 = Key $W $true; Check (-not ($r3.swallowed -or $r4.swallowed)) 'W after Esc in the menus was changed'
+AddLog $gl "[11:21:41][frontend.cpp:635]: `r`n`r`n`t`t[[ Launching SINGLE"
+Check (-not (InGame)) 'half a "Launching" line counted'
+AddLog $gl "PLAYER-game ]]`r`n`tStart-date: 1936.1.1.1`r`n"
+Check (InGame) '"Launching SINGLEPLAYER-game" (split over two reads) not seen'
+Check (-not (WF 'standby').GetValue($null)) 'standby still on when the game started'
+$r = Key $W $false; Check ($r.sent -eq '26vx') "W in the game didn't scroll at once (sent '$($r.sent)')"
+$r = Key $W $true
+$r = Key $E $false; $r = Key $E $true
+AddLog $gl "[11:30:00][effectbase.cpp:2243]:  1:00, 2 January, 1936: Persia: event kr.1`r`n"
+Check ([bool](WF 'standby').GetValue($null)) 'a later log line took the save-screen standby away'
+$r = Key $S $false; $r2 = Key $S $true; Check ($r2.sent -eq '53v 53^') "save name letter s after Esc in the game (sent '$($r2.sent)')"
+AddLog $gl "[11:40:00][frontend.cpp:635]: [[ Launching SINGLEPLAYER-game ]]"   # no line end: stays in the kept tail
+AddLog $sl "[11:41:00][gameapplication.cpp:2354]: Resetting game`r`n"         # back in the menus (another log)
+Check (-not (InGame)) '"Resetting game" after the game didn''t switch WASD off'
+AddLog $gl "`r`n"
+Check (-not (InGame)) 'an old "Launching" in the kept tail was counted again'
+$r = Key $W $false; $r2 = Key $W $true; Check (-not ($r.swallowed -or $r2.swallowed)) 'W back in the menus was changed'
+AddLog $sl "[11:42:00][frontend.cpp:635]: `r`n`t`t[[ Launching MULTIPLAYER-game ]]`r`n"
+Check (InGame) '"Launching MULTIPLAYER-game" not seen'
+[IO.File]::WriteAllText($gl, 'x'); $readLogs.Invoke($null, $null) | Out-Null
+Check (InGame) 'a new, short game.log alone switched WASD off'
+$initLogs.Invoke($null, [object[]]@([string](Join-Path $Work 'no-such-folder'))) | Out-Null
+Check ((InGame) -and (WF 'standby').GetValue($null)) 'without a log folder WASD is not in standby-in-game (fallback)'
+[Runtime.InteropServices.Marshal]::FreeHGlobal($mem)
+$fail += $lbad
+"4b. menus vs. game from the logs: $checks checks (old session ignored, menus untouched, split lines, Esc/save names in game, back to menus, multiplayer, no log folder), wrong: $lbad"
 
 # ---------- 5. WASD default and remembered choice ----------
 $f2 = [Activator]::CreateInstance($t, $true); $null = $f2.Handle
